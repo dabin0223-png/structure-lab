@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>구조식 탐구 개인용</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 실험대 같은 회녹색 바탕 위에 문제 카드(왼쪽)와 원자 격자판(오른쪽). 전자칠판은 문제 크게 + 타이머·점수판 */
+:root{
+  --bg:#E9EEEA; --surface:#FBFCFA; --ink:#17201C; --muted:#5A6862; --line:#C6D0CA;
+  --accent:#0D7462; --accent-soft:#D3EAE3; --ok:#1C7F46; --ok-soft:#D8F0E1; --bad:#BF3B2B; --bad-soft:#F7DDD8;
+  --atom-c:#2A2F2C; --atom-o:#CC3B29; --atom-n:#2856C8; --atom-h:#6F7D77;
+  --f-display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Menlo","Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121816; --surface:#1B2320; --ink:#E6EEE9; --muted:#97A69F; --line:#33413B;
+  --accent:#4DC2A8; --accent-soft:#1E3A33; --ok:#5CCB8B; --ok-soft:#1C3527; --bad:#F07A68; --bad-soft:#3E2420;
+  --atom-c:#E2E8E4; --atom-o:#FF7F6B; --atom-n:#7FA2FF; --atom-h:#A9B6B0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --surface:#1B2320; --ink:#E6EEE9; --muted:#97A69F; --line:#33413B;
+  --accent:#4DC2A8; --accent-soft:#1E3A33; --ok:#5CCB8B; --ok-soft:#1C3527; --bad:#F07A68; --bad-soft:#3E2420;
+  --atom-c:#E2E8E4; --atom-o:#FF7F6B; --atom-n:#7FA2FF; --atom-h:#A9B6B0; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+#app{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px;max-width:1800px;margin:0 auto}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:6px 14px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:clamp(26px,3vw,36px);margin:0;letter-spacing:.01em}
+.brand span{color:var(--muted);font-size:14px}
+.ghost{background:transparent;border:1.5px solid var(--line);border-radius:10px;padding:8px 14px;min-height:44px}
+.ghost:hover{border-color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+.eyebrow{font-size:13px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+
+/* 홈 */
+.home{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;margin-top:8px}
+.mode{display:flex;flex-direction:column;gap:10px;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:28px;min-height:200px}
+.mode:hover{border-color:var(--accent)}
+.mode b{font-family:var(--f-display);font-weight:400;font-size:30px}
+.mode p{margin:0;color:var(--muted);max-width:40ch}
+.mode .go{margin-top:auto;color:var(--accent);font-weight:700}
+.howto{margin-top:16px;color:var(--muted);font-size:15px;max-width:72ch}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-width:52px;min-height:52px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-weight:600;font-size:18px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.tag{display:inline-block;font-size:14px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 12px}
+.given{font-family:var(--f-mono);font-weight:600;overflow-wrap:anywhere}
+
+/* 전자칠판 */
+.board{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:16px}
+.bq{display:flex;flex-direction:column;gap:18px;min-width:0}
+.bq .qno{font-family:var(--f-display);font-size:clamp(56px,7vw,96px);line-height:1;color:var(--accent)}
+.bq h2{font-family:var(--f-display);font-weight:400;font-size:clamp(32px,4vw,56px);line-height:1.15;margin:0;text-wrap:balance}
+.bq .given{font-size:clamp(24px,3vw,42px)}
+.bq .body{font-size:clamp(18px,1.8vw,26px);margin:0}
+.bcode{font-family:var(--f-mono);font-weight:600;font-size:clamp(20px,2.2vw,32px);border:2px solid var(--accent);color:var(--accent);border-radius:12px;padding:2px 14px}
+.bcode b{font-size:1.25em;letter-spacing:.08em}
+.reveal{border-top:1.5px dashed var(--line);padding-top:16px;display:flex;flex-direction:column;gap:6px}
+.reveal .given{font-size:clamp(22px,2.4vw,34px);color:var(--ok)}
+.reveal p{margin:0;color:var(--muted);font-size:clamp(16px,1.5vw,22px)}
+.brow{display:flex;gap:10px;flex-wrap:wrap}
+.btn{min-height:52px;border-radius:12px;padding:0 20px;border:1.5px solid var(--ink);background:var(--ink);color:var(--surface);font-weight:700}
+.btn.alt{background:transparent;color:var(--ink)}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.timer{font-family:var(--f-mono);font-weight:600;font-size:64px;line-height:1;font-variant-numeric:tabular-nums}
+.score{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px 10px}
+.score .g{font-weight:700}
+.score .pts{font-family:var(--f-mono);font-weight:600;font-size:30px;text-align:right;font-variant-numeric:tabular-nums}
+.sbtn{width:48px;height:48px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-size:22px;font-weight:700}
+.gcount{display:flex;gap:6px;flex-wrap:wrap}
+.gcount .chip{min-width:44px;min-height:44px;font-size:16px}
+
+/* 스탠바이미 */
+.group{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:16px}
+.gq{display:flex;flex-direction:column;gap:14px;min-width:0}
+.gq .qno{font-family:var(--f-display);font-size:44px;line-height:1;color:var(--accent)}
+.gq h2{font-family:var(--f-display);font-weight:400;font-size:30px;margin:0;line-height:1.2}
+.gq .given{font-size:22px}
+.gq .body{margin:0;font-size:17px}
+.idbox{display:flex;flex-direction:column;gap:12px}
+.idrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fld{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:15px;color:var(--muted)}
+.fld input,.fld select{min-height:56px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;font:inherit;font-size:20px;font-weight:700;width:100%}
+.me{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border-radius:12px;padding:10px 14px}
+.who{font-weight:700;font-size:20px}
+.tally{font-size:14px;color:var(--muted);font-family:var(--f-mono)}
+.key.done::after{content:" ✓";color:var(--ok);font-size:.7em}
+.grpsel{display:flex;align-items:center;gap:10px}
+.grpsel select{min-height:48px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);padding:0 12px;font-weight:700}
+.codebox{display:flex;flex-direction:column;gap:12px}
+.codedisp{font-family:var(--f-mono);font-weight:600;font-size:48px;letter-spacing:.2em;text-align:center;background:var(--bg);border-radius:12px;padding-block:6px}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{min-height:64px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-size:26px;font-weight:600}
+.key.fn{font-family:var(--f-body);font-size:18px;font-weight:700}
+.result{border-radius:14px;padding:16px;font-size:18px;font-weight:700;display:flex;flex-direction:column;gap:4px}
+.result small{font-weight:500;font-size:15px}
+.result.ok{background:var(--ok-soft);color:var(--ok)}
+.result.bad{background:var(--bad-soft);color:var(--bad)}
+.result .big{font-family:var(--f-display);font-weight:400;font-size:40px;line-height:1.1}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{from{transform:scale(.94);opacity:.4}to{transform:none;opacity:1}}
+.work{display:flex;flex-direction:column;gap:10px;min-width:0}
+.svgwrap{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px}
+.svgwrap svg{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none;touch-action:none}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tool{min-width:64px;min-height:64px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-weight:700;font-size:17px;padding:0 14px;touch-action:none}
+.tool.el{font-family:var(--f-mono);font-size:30px;min-width:72px}
+.tool[data-el="C"]{color:var(--atom-c)} .tool[data-el="H"]{color:var(--atom-h)} .tool[data-el="O"]{color:var(--atom-o)} .tool[data-el="N"]{color:var(--atom-n)}
+.tool[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.tool:disabled,.submit:disabled{opacity:.4;cursor:default}
+.sep{flex:1 1 12px}
+.vr{width:1.5px;align-self:stretch;background:var(--line)}
+.submit{min-height:64px;border-radius:14px;border:none;background:var(--accent);color:var(--surface);font-weight:700;font-size:20px;padding:0 28px}
+.status{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:15px}
+.status .formula{font-family:var(--f-mono);font-weight:600;color:var(--ink);font-size:18px}
+.toast{min-height:24px;color:var(--bad);font-weight:700;font-size:15px}
+.steps{display:flex;gap:6px 18px;flex-wrap:wrap;margin:0;padding:0;list-style:none;color:var(--muted);font-size:15px}
+.steps b{color:var(--ink)}
+#ghost{position:fixed;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:28px;background:var(--surface);border:3px solid var(--accent);pointer-events:none;z-index:20;opacity:.9}
+
+/* 격자판 SVG */
+.dot{fill:var(--line)}
+.bond{stroke:var(--ink);stroke-width:5;stroke-linecap:round}
+.atom circle.body{fill:var(--surface);stroke-width:3.5}
+.atom text{font-family:var(--f-mono);font-weight:600;text-anchor:middle;dominant-baseline:central}
+.atom.C circle.body{stroke:var(--atom-c)} .atom.C text{fill:var(--atom-c)}
+.atom.O circle.body{stroke:var(--atom-o)} .atom.O text{fill:var(--atom-o)}
+.atom.N circle.body{stroke:var(--atom-n)} .atom.N text{fill:var(--atom-n)}
+.atom.H circle.body{stroke:var(--atom-h)} .atom.H text{fill:var(--atom-h)}
+.atom.over circle.body{stroke:var(--bad);fill:var(--bad-soft);stroke-dasharray:8 5}
+.badge circle{fill:var(--accent)} .badge text{fill:var(--surface);font-family:var(--f-mono);font-weight:600;font-size:17px;text-anchor:middle;dominant-baseline:central}
+.badge.bad circle{fill:var(--bad)}
+.hit{fill:transparent}
+.pv-line{stroke:var(--accent);stroke-width:5;stroke-dasharray:10 8;stroke-linecap:round}
+.pv-cell{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.pv-cell.no{fill:var(--bad-soft);stroke:var(--bad)}
+
+/* 제출 갤러리 */
+.gallery{grid-column:1/-1;display:flex;flex-direction:column;gap:14px}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ghead h3{font-family:var(--f-display);font-weight:400;font-size:28px;margin:0}
+.sync{font-size:14px;color:var(--muted)}
+.sync.on::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:6px}
+.sync.off::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad);margin-right:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:12px}
+.card{display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:12px;min-height:220px}
+.card.ok{border-color:var(--ok);box-shadow:inset 0 4px 0 var(--ok)}
+.card.bad{border-color:var(--bad);box-shadow:inset 0 4px 0 var(--bad)}
+.card .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card .gname{font-weight:700;font-size:18px}
+.pill{font-size:13px;font-weight:700;border-radius:999px;padding:2px 10px;background:var(--bg);color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.card svg{width:100%;height:130px;display:block;background:var(--bg);border-radius:10px}
+.card .meta{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+.card .empty{flex:1;display:grid;place-items:center;color:var(--muted);background:var(--bg);border-radius:10px;font-size:14px}
+.hlc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:3;stroke-dasharray:7 5}
+.hlt{fill:var(--accent);font-family:var(--f-body);font-weight:700;font-size:22px;text-anchor:middle;paint-order:stroke;stroke:var(--surface);stroke-width:6px;stroke-linejoin:round}
+.fbk{display:flex;flex-direction:column;gap:2px;font-weight:500;font-size:15px;color:var(--ink);background:var(--surface);border-radius:10px;padding:10px 12px}
+.fbk b{font-size:16px}
+.fbk ul{margin:4px 0 0;padding-left:18px}
+.fbh{font-size:14px;font-weight:500;color:var(--muted)}
+.tfb{border:2px solid var(--accent);background:var(--accent-soft);color:var(--ink);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.tfb b{color:var(--accent)}
+.sel2{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);padding:0 10px;font-weight:700}
+#modal{position:fixed;inset:0;z-index:30;background:color-mix(in srgb,var(--ink) 55%,transparent);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#modal .box{background:var(--surface);border-radius:18px;padding:20px;width:min(1200px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
+#modal svg{width:100%;height:auto;max-height:70vh;background:var(--bg);border-radius:12px}
+#modal h3{font-family:var(--f-display);font-weight:400;font-size:34px;margin:0}
+.sent{font-size:14px;font-weight:700;color:var(--muted)}
+.sent.ok{color:var(--ok)} .sent.bad{color:var(--bad)}
+
+@media (max-width:960px){.board,.group{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand"><h1>구조식 탐구</h1><span>화학 반응의 세계 · 3. 탄소 화합물과 반응</span></div>
+    <button class="ghost" id="toHome" type="button" hidden>화면 바꾸기</button>
+  </header>
+
+  <section id="home" aria-label="화면 선택">
+    <div class="home">
+      <button class="mode" type="button" data-go="board">
+        <span class="eyebrow">교사용 · 전자칠판</span>
+        <b>문제판</b>
+        <p>문제를 크게 띄우고, 제한 시간과 모둠별 점수를 관리합니다. 정답 공개로 바로 개념을 정리합니다.</p>
+        <span class="go">전자칠판으로 열기 →</span>
+      </button>
+      <button class="mode" type="button" data-go="group">
+        <span class="eyebrow">모둠용 · 스탠바이미</span>
+        <b>분자 작업대</b>
+        <p>원자를 끌어다 놓고, 원자에서 옆 칸으로 끌어 결합을 이어 구조식을 조립합니다. 제출하면 바로 채점합니다.</p>
+        <span class="go">스탠바이미로 열기 →</span>
+      </button>
+    </div>
+    <p class="howto">모둠 화면에는 문제 번호만 보이고 문제 내용은 보이지 않습니다. 교사가 전자칠판에 띄운 문제를 보고, 모둠은 같은 번호를 눌러 바로 구조식을 만듭니다. 학생은 수소(H)를 포함한 모든 원자를 직접 결합해 구조식을 완성합니다.</p>
+  </section>
+
+  <section id="board" aria-label="전자칠판 문제판" hidden>
+    <div class="board">
+      <div class="panel bq">
+        <div class="chips" id="bChips"></div>
+        <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+          <div class="qno" id="bNo"></div>
+          <span class="tag" id="bTag"></span>
+        </div>
+        <h2 id="bTitle"></h2>
+        <div class="given" id="bGiven"></div>
+        <p class="body" id="bBody"></p>
+        <div class="brow">
+          <button class="btn" id="bReveal" type="button">정답 공개</button>
+          <button class="btn alt" id="bPrev" type="button">← 이전 문제</button>
+          <button class="btn alt" id="bNext" type="button">다음 문제 →</button>
+        </div>
+        <div class="reveal" id="bAns" hidden>
+          <span class="eyebrow">정답</span>
+          <div class="given" id="bAnsF"></div>
+          <p id="bAnsN"></p>
+        </div>
+      </div>
+      <div class="side">
+        <div class="panel" style="display:flex;flex-direction:column;gap:12px">
+          <span class="eyebrow">경과 시간</span>
+          <div class="timer" id="tDisp">0:00</div>
+          <div class="brow">
+            <button class="btn" id="tGo" type="button">시작</button>
+            <button class="btn alt" id="tReset" type="button">처음부터</button>
+          </div>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="eyebrow">모둠 점수</span>
+            <div class="gcount" id="gCount" aria-label="모둠 수"></div>
+          </div>
+          <div class="score" id="scores"></div>
+          <button class="ghost" id="sReset" type="button">점수 초기화</button>
+        </div>
+      </div>
+      <div class="panel gallery">
+        <div class="ghead">
+          <h3>제출 갤러리 <span id="gQlabel" style="color:var(--accent)"></span></h3>
+          <div class="brow" style="align-items:center">
+            <label class="eyebrow" for="bCls">학급</label><select class="sel2" id="bCls"></select>
+            <button class="ghost" id="newLesson" type="button">새 수업 시작</button>
+            <span class="sync" id="sync"></span>
+          </div>
+        </div>
+        <div class="cards" id="cards"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="group" aria-label="개인 분자 작업대" hidden>
+    <div class="group">
+      <div class="panel gq">
+        <form class="idbox" id="idBox" novalidate>
+          <div class="eyebrow">내 정보를 입력하고 시작하세요</div>
+          <div class="idrow">
+            <label class="fld"><span>반</span><select id="cls"></select></label>
+            <label class="fld"><span>번호</span><input id="num" type="number" inputmode="numeric" min="1" max="40" placeholder="예: 13"></label>
+          </div>
+          <label class="fld"><span>이름</span><input id="nm" type="text" maxlength="12" autocomplete="off" placeholder="이름 입력"></label>
+          <div class="toast" id="idMsg" aria-live="polite"></div>
+          <button class="submit" type="submit">시작하기</button>
+        </form>
+        <div class="me" id="meBar" hidden>
+          <div><div class="who" id="who"></div><div class="tally" id="tally"></div></div>
+          <button class="ghost" id="chgMe" type="button">정보 바꾸기</button>
+        </div>
+        <div class="codebox" id="pickBox" hidden>
+          <div class="eyebrow">전자칠판에 나온 문제 번호를 누르세요</div>
+          <div class="keypad" id="qPick"></div>
+        </div>
+        <div class="gq" id="qView" hidden>
+          <div class="qno" id="gNo"></div>
+          <p class="body">전자칠판의 문제를 보고 구조식을 만들어 제출하세요.</p>
+        </div>
+        <div id="gResult" aria-live="polite"></div>
+        <div class="sent" id="gSent" aria-live="polite"></div>
+        <div id="gTeacher" aria-live="polite"></div>
+      </div>
+      <div class="work">
+        <ul class="steps">
+          <li><b>① 놓기</b> 아래 원자를 빈 칸으로 끌어다 놓기</li>
+          <li><b>② 붙이기</b> 원자에서 옆 칸으로 끌면 고른 원자가 결합된 채 생김</li>
+          <li><b>③ 이중 결합</b> 이웃한 두 원자를 한 번 더 이어 주기</li>
+        </ul>
+        <div class="svgwrap"><svg id="grid" viewBox="0 0 1200 700" role="img" aria-label="원자 격자판"></svg></div>
+        <div class="status"><span>현재 분자식 <span class="formula" id="gFormula">—</span></span><span id="gHint">원자 옆의 숫자는 아직 이을 수 있는 결합 수입니다</span></div>
+        <div class="toast" id="toast" aria-live="polite"></div>
+        <div class="tools" role="toolbar" aria-label="도구">
+          <button class="tool el" data-el="C" type="button" aria-label="탄소">C</button>
+          <button class="tool el" data-el="H" type="button" aria-label="수소">H</button>
+          <button class="tool el" data-el="O" type="button" aria-label="산소">O</button>
+          <button class="tool el" data-el="N" type="button" aria-label="질소">N</button>
+          <span class="vr" aria-hidden="true"></span>
+          <button class="tool" id="erase" type="button" aria-pressed="false">지우개</button>
+          <button class="tool" id="undo" type="button">↶ 되돌리기</button>
+          <button class="tool" id="clear" type="button">전체 지우기</button>
+          <span class="sep"></span>
+          <button class="submit" id="submit" type="button">제출하기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="ghost" hidden></div>
+<div id="modal" hidden><div class="box" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h3 id="mTitle"></h3><button class="btn" id="mClose" type="button">닫기</button></div>
+  <div id="mBody"></div>
+</div></div>
+
+<script src="config.js"></script>
+<script>
+/* 시트 주소는 같은 폴더의 config.js 한 곳에서만 바꿉니다. 없으면 시트 연동 없이 단독으로 동작합니다. */
+const SHEET_API = String(window.SHEET_API_URL || '').trim();
+
+/* ===== 문제 데이터 (정답은 간이 SMILES: C,N,O / = 이중결합 / () 가지, H는 원자가로 계산) ===== */
+const QS=[
+ {tag:'작용기',title:'에스터를 만들어라',given:'−COO−',body:'에스터 결합을 가진 분자를 아무거나 하나 만드세요.',pattern:'ester',reveal:'예) CH₃COOCH₃, HCOOCH₂CH₃, CH₃COOCH₂CH₃',note:'카복실산 −COOH의 H 자리에 탄화수소기가 결합하면 에스터가 됩니다. 모둠마다 다른 답을 비교해 공통 구조를 찾아보세요.'},
+ {tag:'작용기',title:'카복실산을 만들어라',given:'−COOH',body:'카복실기를 가진 분자를 아무거나 하나 만드세요.',pattern:'acid',reveal:'예) HCOOH, CH₃COOH, CH₃CH₂COOH',note:'카복실기는 하나의 탄소에 C=O와 −OH가 함께 결합한 구조입니다.'},
+ {tag:'화합물',title:'에탄올',given:'C₂H₅OH',body:'소주에 들어 있는 에탄올의 구조식을 만드세요.',answers:['CCO'],reveal:'CH₃CH₂OH',note:'하이드록시기(−OH)가 탄소에 결합한 알코올입니다.'},
+ {tag:'화합물',title:'아세트산 에틸',given:'CH₃COOC₂H₅',body:'아세트산 에틸의 구조식을 만드세요.',answers:['CC(=O)OCC'],reveal:'CH₃COOCH₂CH₃',note:'아세트산(산 부분)과 에탄올(알코올 부분)이 에스터 결합으로 이어져 있습니다.'},
+ {tag:'생성물 예측',title:'에탄올의 산화',given:'CH₃CH₂OH ─ 충분히 산화 → ?',body:'최종 생성되는 카복실산의 구조식을 만드세요.',answers:['CC(=O)O'],reveal:'CH₃COOH (아세트산)',note:'1차 알코올은 알데하이드(CH₃CHO)를 거쳐 카복실산으로 산화됩니다.'},
+ {tag:'생성물 예측',title:'1-프로판올의 산화',given:'CH₃CH₂CH₂OH ─ 충분히 산화 → ?',body:'최종 생성되는 카복실산의 구조식을 만드세요.',answers:['CCC(=O)O'],reveal:'CH₃CH₂COOH (프로판산)',note:'탄소 수는 그대로이고, −CH₂OH가 −COOH로 바뀝니다.'},
+ {tag:'생성물 예측',title:'에스터화 반응',given:'CH₃COOH + CH₃OH ─ 진한 황산, 가열 →',body:'생성물 2가지를 모두 만드세요.',answers:['CC(=O)OC','O'],reveal:'CH₃COOCH₃ (아세트산 메틸) + H₂O',note:'카복실산과 알코올에서 물이 빠지며 에스터가 생성됩니다. 에스터화는 가역 반응입니다.'},
+ {tag:'생성물 예측',title:'에스터의 가수 분해',given:'CH₃COOC₂H₅ + H₂O →',body:'생성물 2가지를 모두 만드세요.',answers:['CC(=O)O','CCO'],reveal:'CH₃COOH + CH₃CH₂OH',note:'가수 분해는 에스터화의 역반응으로, 카복실산과 알코올이 생성됩니다.'},
+ {tag:'역추적',title:'바나나향의 재료',given:'CH₃COOCH₂CH₂CH(CH₃)₂',body:'바나나향 아세트산 아이소아밀을 만드는 데 필요한 카복실산과 알코올을 모두 만드세요.',answers:['CC(=O)O','CC(C)CCO'],reveal:'CH₃COOH + (CH₃)₂CHCH₂CH₂OH (3-메틸뷰탄-1-올)',note:'소주의 에탄올은 산화해 산 부분(아세트산)으로 쓸 수 있지만, 알코올 부분은 따로 넣어야 합니다.'},
+ {tag:'역추적',title:'파인애플향의 재료',given:'CH₃CH₂CH₂COOC₂H₅',body:'파인애플향 뷰탄산 에틸을 만드는 데 필요한 카복실산과 알코올을 모두 만드세요.',answers:['CCCC(=O)O','CCO'],reveal:'CH₃CH₂CH₂COOH + CH₃CH₂OH',note:'이번에는 소주의 에탄올을 그대로 알코올 부분으로 쓸 수 있습니다.'}
+];
+const CODES=['418','263','905','137','752','386','624','591','870','349'];
+QS.forEach((q,i)=>q.code=CODES[i]);
+const VAL={C:4,O:2,N:3,H:1};
+const SUBS='₀₁₂₃₄₅₆₇₈₉';
+const sub=n=>String(n).split('').map(d=>SUBS[+d]).join('');
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem('sb_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('sb_'+k,JSON.stringify(v))}catch(e){}}};
+
+/* ===== 그래프 유틸 ===== */
+function mkGraph(atoms,bonds){
+  const g=atoms.map(a=>({el:a.el,nb:[],sum:0}));
+  bonds.forEach(b=>{g[b.a].nb.push({j:b.b,o:b.o});g[b.b].nb.push({j:b.a,o:b.o});g[b.a].sum+=b.o;g[b.b].sum+=b.o});
+  g.forEach(x=>x.h=VAL[x.el]-x.sum);
+  return g;
+}
+function parseS(s){
+  const atoms=[],bonds=[],st=[];let prev=-1,ord=1;
+  for(const ch of s){
+    if(ch==='(')st.push(prev);else if(ch===')')prev=st.pop();
+    else if(ch==='=')ord=2;else if(ch==='#')ord=3;
+    else{const i=atoms.length;atoms.push({el:ch});if(prev>=0)bonds.push({a:prev,b:i,o:ord});prev=i;ord=1}
+  }
+  return mkGraph(atoms,bonds);
+}
+function fmtCount(c){
+  if(!c.C&&c.H===2&&c.O===1&&!c.N)return 'H₂O';
+  let s='';['C','H','N','O'].forEach(e=>{if(c[e])s+=e+(c[e]>1?sub(c[e]):'')});return s||'—';
+}
+function formula(g){const c={C:0,H:0,N:0,O:0};g.forEach(a=>{c[a.el]++;if(a.el!=='H')c.H+=Math.max(0,a.h)});return fmtCount(c)}
+const sig=x=>x.el+x.h+'/'+x.nb.length+'/'+x.nb.map(n=>n.o).sort().join('');
+const bo=(G,i,j)=>{const n=G[i].nb.find(n=>n.j===j);return n?n.o:0};
+function iso(A,B){
+  if(A.length!==B.length)return false;
+  if(A.map(sig).sort().join('|')!==B.map(sig).sort().join('|'))return false;
+  const order=[],seen=new Set([0]),q=[0];
+  while(q.length){const i=q.shift();order.push(i);A[i].nb.forEach(n=>{if(!seen.has(n.j)){seen.add(n.j);q.push(n.j)}})}
+  const map=new Array(A.length).fill(-1),used=new Array(B.length).fill(false);
+  function rec(k){
+    if(k===order.length)return true;const i=order[k];
+    for(let c=0;c<B.length;c++){
+      if(used[c]||sig(B[c])!==sig(A[i]))continue;
+      let ok=true;
+      for(const n of A[i].nb){const m=map[n.j];if(m>=0&&bo(B,c,m)!==n.o){ok=false;break}}
+      if(ok)for(const n of B[c].nb){const ai=map.indexOf(n.j);if(ai>=0&&bo(A,i,ai)!==n.o){ok=false;break}}
+      if(!ok)continue;map[i]=c;used[c]=true;if(rec(k+1))return true;map[i]=-1;used[c]=false;
+    }
+    return false;
+  }
+  return rec(0);
+}
+const PAT={
+  ester:g=>g.some((a,i)=>a.el==='C'&&a.nb.some(n=>n.o===2&&g[n.j].el==='O'&&g[n.j].nb.length===1)&&
+    a.nb.some(n=>n.o===1&&g[n.j].el==='O'&&g[n.j].h===0&&g[n.j].nb.length===2&&g[n.j].nb.some(m=>m.j!==i&&g[m.j].el==='C'&&m.o===1))),
+  acid:g=>g.some(a=>a.el==='C'&&a.nb.some(n=>n.o===2&&g[n.j].el==='O'&&g[n.j].nb.length===1)&&
+    a.nb.some(n=>n.o===1&&g[n.j].el==='O'&&g[n.j].h===1&&g[n.j].nb.length===1))
+};
+const PATHINT={ester:'에스터 결합(C=O에 붙은 −O−가 다시 탄소와 결합)이 보이지 않아요.',acid:'카복실기(같은 탄소에 C=O와 −OH)가 보이지 않아요.'};
+
+/* ===== 화면 전환 ===== */
+function route(){
+  const v='group';
+  ['home','board','group'].forEach(s=>$(s).hidden=(s!==v));
+  $('toHome').hidden=true;
+  if(v==='board')renderBoard();if(v==='group'){renderGroupQ();renderGrid()}
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>location.hash=b.dataset.go);
+$('toHome').onclick=()=>{location.hash='home'};
+window.addEventListener('hashchange',route);
+
+/* ===== 전자칠판 ===== */
+const B={cls:store.get('bc','1반'),q:store.get('bq',0),groups:store.get('bg',6),scores:store.get('bs',[0,0,0,0,0,0,0,0]),reveal:false,run:false,acc:0,t0:0};
+function chipRow(el,cur,fn){el.innerHTML='';QS.forEach((_,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=i+1;b.setAttribute('aria-pressed',i===cur);b.onclick=()=>fn(i);el.appendChild(b)})}
+function setBQ(i){B.q=Math.max(0,Math.min(QS.length-1,i));B.reveal=false;store.set('bq',B.q);resetTimer();renderBoard()}
+function renderBoard(){
+  const q=QS[B.q];chipRow($('bChips'),B.q,setBQ);
+  $('bNo').textContent='Q'+(B.q+1);$('bTag').textContent=q.tag;$('bTitle').textContent=q.title;
+  $('bGiven').textContent=q.given;$('bBody').textContent=q.body;
+  $('bAns').hidden=!B.reveal;$('bAnsF').textContent=q.reveal;$('bAnsN').textContent=q.note||'';
+  $('bReveal').textContent=B.reveal?'정답 숨기기':'정답 공개';
+  const gc=$('gCount');gc.innerHTML='';[4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=n;b.setAttribute('aria-pressed',n===B.groups);b.setAttribute('aria-label','모둠 '+n+'개');b.onclick=()=>{B.groups=n;store.set('bg',n);renderBoard()};gc.appendChild(b)});
+  const sc=$('scores');sc.innerHTML='';
+  for(let g=0;g<B.groups;g++){
+    sc.insertAdjacentHTML('beforeend',`<span class="g">${g+1}모둠</span><span class="pts">${B.scores[g]}</span><button class="sbtn" type="button" data-g="${g}" data-d="-1" aria-label="${g+1}모둠 1점 빼기">−</button><button class="sbtn" type="button" data-g="${g}" data-d="1" aria-label="${g+1}모둠 1점 더하기">+</button>`);
+  }
+  sc.querySelectorAll('.sbtn').forEach(b=>b.onclick=()=>{const g=+b.dataset.g;B.scores[g]=Math.max(0,B.scores[g]+ +b.dataset.d);store.set('bs',B.scores);renderBoard()});
+  renderGallery();
+}
+$('bReveal').onclick=()=>{B.reveal=!B.reveal;if(B.reveal&&B.run)toggleTimer();renderBoard()};
+$('bPrev').onclick=()=>setBQ(B.q-1);$('bNext').onclick=()=>setBQ(B.q+1);
+function elapsed(){return B.acc+(B.run?Date.now()-B.t0:0)}
+function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function toggleTimer(){if(B.run){B.acc+=Date.now()-B.t0;B.run=false}else{B.t0=Date.now();B.run=true}$('tGo').textContent=B.run?'멈춤':'시작'}
+function resetTimer(){B.run=false;B.acc=0;$('tGo').textContent='시작';$('tDisp').textContent='0:00'}
+$('tGo').onclick=toggleTimer;$('tReset').onclick=resetTimer;
+setInterval(()=>{if(B.run)$('tDisp').textContent=fmt(elapsed())},250);
+let resetArm=null;
+$('sReset').onclick=()=>{
+  if(resetArm){clearTimeout(resetArm);resetArm=null;B.scores=[0,0,0,0,0,0,0,0];store.set('bs',B.scores);$('sReset').textContent='점수 초기화';renderBoard();return}
+  $('sReset').textContent='한 번 더 누르면 모든 점수가 0이 됩니다';
+  resetArm=setTimeout(()=>{resetArm=null;$('sReset').textContent='점수 초기화'},3000);
+};
+
+/* ===== 제출 갤러리 (구글 시트 연동) ===== */
+const CLASSES=Array.from({length:12},(_,i)=>(i+1)+'반');
+const ELC={C:'#2A2F2C',O:'#CC3B29',N:'#2856C8',H:'#6F7D77'};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 구조 데이터 → SVG (inline=true면 시트 저장용 그림으로 색을 직접 지정) */
+function structSVG(st,inline){
+  if(!st||!Array.isArray(st.a)||!st.a.length)return null;
+  let c0=99,c1=-1,r0=99,r1=-1;
+  st.a.forEach(([e,c,r])=>{c0=Math.min(c0,c);c1=Math.max(c1,c);r0=Math.min(r0,r);r1=Math.max(r1,r)});
+  const X=c0*100,Y=r0*100,W=(c1-c0+1)*100,H=(r1-r0+1)*100;
+  let h=inline?`<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#FFFFFF"/>`:'';
+  (st.b||[]).forEach(([i,j,o])=>{
+    const A=st.a[i],Bt=st.a[j];if(!A||!Bt)return;
+    const x1=A[1]*100+50,y1=A[2]*100+50,x2=Bt[1]*100+50,y2=Bt[2]*100+50;
+    const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,px=-dy/L,py=dx/L;
+    (o===1?[0]:o===2?[-7,7]:[-11,0,11]).forEach(f=>{
+      h+=inline?`<line x1="${x1+px*f}" y1="${y1+py*f}" x2="${x2+px*f}" y2="${y2+py*f}" stroke="#17201C" stroke-width="5" stroke-linecap="round"/>`
+               :`<line class="bond" x1="${x1+px*f}" y1="${y1+py*f}" x2="${x2+px*f}" y2="${y2+py*f}"/>`;
+    });
+  });
+  st.a.forEach(([e,c,r])=>{
+    if(!VAL[e])return;const x=c*100+50,y=r*100+50,isH=e==='H',R=isH?24:31,fs=isH?24:30;
+    h+=inline?`<circle cx="${x}" cy="${y}" r="${R}" fill="#FFFFFF" stroke="${ELC[e]}" stroke-width="3.5"/><text x="${x}" y="${y+1}" fill="${ELC[e]}" font-family="monospace" font-weight="700" font-size="${fs}" text-anchor="middle" dominant-baseline="central">${e}</text>`
+             :`<g class="atom ${e}"><circle class="body" cx="${x}" cy="${y}" r="${R}"/><text x="${x}" y="${y+1}" font-size="${fs}">${e}</text></g>`;
+  });
+  return{vb:`${X} ${Y} ${W} ${H}`,inner:h,w:W,h:H};
+}
+const bCls=$('bCls');CLASSES.forEach(c=>bCls.insertAdjacentHTML('beforeend',`<option>${c}</option>`));bCls.value=B.cls;
+const G={rows:[],since:store.get('since',(()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()})()),awarded:new Set(store.get('aw',[])),last:0,err:false,busy:false};
+bCls.onchange=()=>{B.cls=bCls.value;store.set('bc',B.cls);G.rows=[];renderGallery();poll()};
+async function poll(){
+  if(!SHEET_API||$('board').hidden||G.busy)return;G.busy=true;
+  try{
+    const res=await fetch(SHEET_API+'?cls='+encodeURIComponent(B.cls)+'&since='+G.since);
+    const j=await res.json();G.rows=Array.isArray(j.rows)?j.rows:[];G.err=false;G.last=Date.now();
+    if(!award())renderGallery();
+  }catch(e){G.err=true;renderSync()}
+  G.busy=false;
+}
+function award(){
+  let ch=false;
+  G.rows.forEach(r=>{if(!r.ok||r.grp<1||r.grp>8)return;const k=r.cls+'|'+r.q+'|'+r.grp;if(G.awarded.has(k))return;G.awarded.add(k);B.scores[r.grp-1]++;ch=true});
+  if(ch){store.set('aw',[...G.awarded]);store.set('bs',B.scores);renderBoard()}
+  return ch;
+}
+function renderSync(){
+  const s=$('sync');if(!s)return;
+  if(!SHEET_API){s.className='sync off';s.textContent='시트 미연결 · index.html의 SHEET_API에 주소를 넣어 주세요';return}
+  if(G.err){s.className='sync off';s.textContent='시트 연결 오류 · 다시 시도하는 중';return}
+  s.className='sync on';s.textContent=G.last?'시트 연결됨 · '+Math.round((Date.now()-G.last)/1000)+'초 전 갱신':'시트 연결 중…';
+}
+function rowsFor(g,q){return G.rows.filter(r=>r.grp===g&&r.q===q).sort((a,b)=>a.t-b.t)}
+function renderGallery(){
+  const el=$('cards');if(!el)return;const q=B.q+1;$('gQlabel').textContent='· Q'+q;
+  let h='';
+  for(let g=1;g<=B.groups;g++){
+    const rs=rowsFor(g,q),last=rs[rs.length-1];
+    if(!last){h+=`<div class="card"><div class="row"><span class="gname">${g}모둠</span><span class="pill">대기</span></div><div class="empty">아직 제출 전</div></div>`;continue}
+    const okAt=rs.findIndex(r=>r.ok),s=structSVG(last.struct,false);
+    h+=`<button type="button" class="card ${last.ok?'ok':'bad'}" data-g="${g}"><div class="row"><span class="gname">${g}모둠</span><span class="pill ${last.ok?'ok':'bad'}">${last.ok?'정답':'오답'}</span></div>${s?`<svg viewBox="${s.vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${s.inner}</svg>`:'<div class="empty">그림 없음</div>'}<div class="meta">${esc(last.formula)} · 시도 ${rs.length}회${okAt>=0?' · '+(okAt+1)+'번째 정답':''}</div></button>`;
+  }
+  el.innerHTML=h;
+  el.querySelectorAll('button.card').forEach(b=>b.onclick=()=>openCard(+b.dataset.g,null));
+  renderSync();
+}
+function openCard(g,i){
+  const q=B.q+1,rs=rowsFor(g,q);if(!rs.length)return;
+  if(i==null||i<0||i>=rs.length)i=rs.length-1;
+  const r=rs[i],s=structSVG(r.struct,false);
+  $('mTitle').textContent=`${g}모둠 · Q${q} · ${r.ok?'정답':'오답'}`;
+  $('mBody').innerHTML=`${s?`<svg viewBox="${s.vb}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${g}모둠 제출 구조식">${s.inner}</svg>`:''}
+    <div class="given" style="font-size:24px">${esc(r.formula)}</div>
+    ${!r.ok&&r.msg?`<p style="margin:0;color:var(--muted)">학생 화면 피드백: ${esc(r.msg)}</p>`:''}
+    <div class="brow" style="align-items:center"><button class="btn alt" type="button" id="mPrev" ${i===0?'disabled':''}>← 이전 시도</button><span class="eyebrow">시도 ${i+1} / ${rs.length} · ${r.sec}초</span><button class="btn alt" type="button" id="mNext" ${i===rs.length-1?'disabled':''}>다음 시도 →</button></div>`;
+  $('modal').hidden=false;
+  $('mPrev').onclick=()=>openCard(g,i-1);$('mNext').onclick=()=>openCard(g,i+1);
+}
+$('mClose').onclick=()=>$('modal').hidden=true;
+$('modal').addEventListener('click',e=>{if(e.target.id==='modal')$('modal').hidden=true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('modal').hidden=true});
+let lessonArm=null;
+$('newLesson').onclick=()=>{
+  if(lessonArm){clearTimeout(lessonArm);lessonArm=null;G.since=Date.now();G.awarded=new Set();G.rows=[];B.scores=[0,0,0,0,0,0,0,0];
+    store.set('since',G.since);store.set('aw',[]);store.set('bs',B.scores);$('newLesson').textContent='새 수업 시작';renderBoard();return}
+  $('newLesson').textContent='한 번 더 누르면 갤러리와 점수를 비웁니다';
+  lessonArm=setTimeout(()=>{lessonArm=null;$('newLesson').textContent='새 수업 시작'},3000);
+};
+setInterval(poll,2500);setInterval(renderSync,1000);
+if(!SHEET_API)document.querySelector('.gallery').hidden=true;
+
+/* ===== 모둠 작업대 ===== */
+const COLS=12,ROWS=7,CELL=100;
+const S={q:null,cls:store.get('pc','1반'),num:store.get('pn',''),name:store.get('pm',''),solved:new Set(store.get('ps',[])),el:'C',erase:false,atoms:new Map(),bonds:[],seq:0,result:null,qStart:Date.now(),hist:[],drag:null};
+const clsSel=$('cls');CLASSES.forEach(c=>clsSel.insertAdjacentHTML('beforeend',`<option>${c}</option>`));
+clsSel.value=S.cls;$('num').value=S.num;$('nm').value=S.name;
+const meLabel=()=>`${S.cls} ${S.num}번 ${S.name}`;
+$('idBox').addEventListener('submit',e=>{
+  e.preventDefault();
+  const n=parseInt($('num').value,10),nm=$('nm').value.trim();
+  if(!n||n<1||n>40){$('idMsg').textContent='번호를 1~40 사이 숫자로 입력하세요.';return}
+  if(!nm){$('idMsg').textContent='이름을 입력하세요.';return}
+  const changed=(nm!==S.name||n!==+S.num||clsSel.value!==S.cls);
+  S.cls=clsSel.value;S.num=n;S.name=nm;
+  if(changed){S.solved=new Set();store.set('ps',[])}
+  store.set('pc',S.cls);store.set('pn',S.num);store.set('pm',S.name);
+  $('idMsg').textContent='';renderGroupQ();
+});
+$('chgMe').onclick=()=>{S.name='';S.q=null;S.result=null;clearAll(false);renderGroupQ();renderGrid();$('nm').focus()};
+
+function snap(){S.hist.push({atoms:[...S.atoms.values()].map(a=>({...a})),bonds:S.bonds.map(b=>({...b}))});if(S.hist.length>80)S.hist.shift()}
+function undo(){const h=S.hist.pop();if(!h)return;S.atoms=new Map(h.atoms.map(a=>[a.id,a]));S.bonds=h.bonds;changed()}
+function setGQ(i){setSent('','');S.tries=0;S.hl=null;S.lastT=0;S.tfbShown='';renderTeacherFb();S.q=i;S.result=null;S.qStart=Date.now();clearAll(false);renderGroupQ();renderGrid()}
+
+function renderGroupQ(){
+  const hasMe=!!S.name;
+  $('idBox').hidden=hasMe;$('meBar').hidden=!hasMe;$('pickBox').hidden=!hasMe;
+  if(!hasMe)S.q=null;
+  if(hasMe){$('who').textContent=meLabel();$('tally').textContent=`맞힌 문제 ${S.solved.size} / ${QS.length}`}
+  const locked=S.q==null;
+  $('qView').hidden=locked;$('submit').disabled=locked;
+  const qp=$('qPick');qp.innerHTML='';
+  QS.forEach((_,i)=>{const b=document.createElement('button');b.type='button';b.className='key';b.textContent=i+1;if(S.solved.has(i+1))b.classList.add('done');b.setAttribute('aria-pressed',i===S.q);b.setAttribute('aria-label','문제 '+(i+1));
+    if(i===S.q){b.style.background='var(--accent)';b.style.color='var(--surface)';b.style.borderColor='var(--accent)'}
+    b.onclick=()=>{if(i!==S.q)setGQ(i)};qp.appendChild(b)});
+  if(!locked)$('gNo').textContent='Q'+(S.q+1);
+  const r=$('gResult');
+  if(!S.result){r.innerHTML='';return}
+  r.innerHTML=S.result.ok
+    ?`<div class="result ok pop"><span class="big">정답!</span><span>${esc(meLabel())} · ${S.result.sec}초</span><small>${QS[S.q].note||''}</small></div>`
+    :`<div class="result bad pop"><span class="big">다시 도전</span>${S.result.head?`<small>${esc(S.result.head)}</small>`:''}${S.result.html||`<small>${esc(S.result.msg)}</small>`}</div>`;
+}
+
+function atAt(c,r){for(const a of S.atoms.values())if(a.c===c&&a.r===r)return a.id;return null}
+function free(id){const a=S.atoms.get(id);let s=0;for(const b of S.bonds)if(b.a===id||b.b===id)s+=b.o;return VAL[a.el]-s}
+const inGrid=(c,r)=>c>=0&&r>=0&&c<COLS&&r<ROWS;
+const near=(a,c,r)=>Math.max(Math.abs(a.c-c),Math.abs(a.r-r))===1;
+function addAtom(el,c,r){const id=++S.seq;S.atoms.set(id,{id,el,c,r});return id}
+function removeAtom(id){S.atoms.delete(id);S.bonds=S.bonds.filter(b=>b.a!==id&&b.b!==id)}
+function cycleBond(a,b){
+  const ex=S.bonds.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));
+  const hasH=S.atoms.get(a).el==='H'||S.atoms.get(b).el==='H';
+  if(!ex)S.bonds.push({a,b,o:1});
+  else if(ex.o<(hasH?1:3))ex.o++;
+  else S.bonds=S.bonds.filter(x=>x!==ex);
+}
+/* 결합으로 이어진 덩어리(분자)별로 나누기 */
+function groupsRaw(){
+  const ids=[...S.atoms.keys()],idx=new Map(ids.map((id,i)=>[id,i])),adj=ids.map(()=>[]);
+  S.bonds.forEach(b=>{adj[idx.get(b.a)].push(idx.get(b.b));adj[idx.get(b.b)].push(idx.get(b.a))});
+  const seen=new Array(ids.length).fill(false),out=[];
+  for(let s=0;s<ids.length;s++){
+    if(seen[s])continue;const memb=[],st=[s];seen[s]=true;
+    while(st.length){const i=st.pop();memb.push(ids[i]);adj[i].forEach(j=>{if(!seen[j]){seen[j]=true;st.push(j)}})}
+    out.push(memb);
+  }
+  return out;
+}
+/* 수소를 떼어 내고 골격 그래프로 바꿔 정답과 비교 */
+function toGraphIds(memb){
+  const heavy=memb.filter(id=>S.atoms.get(id).el!=='H');
+  const use=heavy.length?heavy:memb;
+  const local=new Map(use.map((id,k)=>[id,k]));
+  const atoms=use.map(id=>({el:S.atoms.get(id).el}));
+  const bonds=S.bonds.filter(b=>local.has(b.a)&&local.has(b.b)).map(b=>({a:local.get(b.a),b:local.get(b.b),o:b.o}));
+  return {g:mkGraph(atoms,bonds),ids:use};
+}
+function toGraph(memb){return toGraphIds(memb).g}
+function liveFormula(memb){const c={C:0,H:0,N:0,O:0};memb.forEach(id=>c[S.atoms.get(id).el]++);return fmtCount(c)}
+
+function renderGrid(){
+  let h=`<rect class="hit" x="0" y="0" width="1200" height="700"/>`;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)h+=`<circle class="dot" cx="${c*CELL+50}" cy="${r*CELL+50}" r="4"/>`;
+  if(S.hl)S.hl.forEach(g=>g.ids.forEach(id=>{const a=S.atoms.get(id);if(a)h+=`<circle class="hlc" cx="${a.c*CELL+50}" cy="${a.r*CELL+50}" r="44"/>`}));
+  S.bonds.forEach(b=>{
+    const A=S.atoms.get(b.a),Bt=S.atoms.get(b.b);
+    const x1=A.c*CELL+50,y1=A.r*CELL+50,x2=Bt.c*CELL+50,y2=Bt.r*CELL+50;
+    const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),px=-dy/L,py=dx/L;
+    const offs=b.o===1?[0]:b.o===2?[-7,7]:[-11,0,11];
+    offs.forEach(o=>h+=`<line class="bond" x1="${x1+px*o}" y1="${y1+py*o}" x2="${x2+px*o}" y2="${y2+py*o}"/>`);
+  });
+  for(const a of S.atoms.values()){
+    const f=free(a.id),x=a.c*CELL+50,y=a.r*CELL+50,isH=a.el==='H',R=isH?24:31;
+    h+=`<g class="atom ${a.el}${f<0?' over':''}"><circle class="body" cx="${x}" cy="${y}" r="${R}"/><text x="${x}" y="${y+1}" font-size="${isH?24:30}">${a.el}</text></g>`;
+    if(f!==0)h+=`<g class="badge${f<0?' bad':''}"><circle cx="${x+R-2}" cy="${y-R+2}" r="13"/><text x="${x+R-2}" y="${y-R+3}">${f<0?'!':f}</text></g>`;
+  }
+  if(S.hl)S.hl.forEach(g=>{const as=g.ids.map(id=>S.atoms.get(id)).filter(Boolean);if(!as.length)return;const top=as.reduce((m,a)=>a.r<m.r?a:m,as[0]);const cx=as.reduce((s,a)=>s+a.c,0)/as.length*CELL+50;const y=top.r*CELL+50-54;h+=`<text class="hlt" x="${Math.min(1130,Math.max(70,cx))}" y="${Math.max(22,y)}">${esc(g.label)}</text>`});
+  h+=`<g id="ov"></g>`;
+  $('grid').innerHTML=h;
+  const gs=groupsRaw();
+  $('gFormula').textContent=gs.length?gs.map(liveFormula).join(' + '):'—';
+  document.querySelectorAll('.tool[data-el]').forEach(b=>b.setAttribute('aria-pressed',!S.erase&&b.dataset.el===S.el));
+  $('erase').setAttribute('aria-pressed',S.erase);
+  $('undo').disabled=!S.hist.length;
+}
+let toastT=null;
+function toast(m){$('toast').textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>$('toast').textContent='',2600)}
+function changed(){S.hl=null;if(S.result){S.result=null;renderGroupQ()}renderGrid()}
+
+/* --- 격자판 터치·드래그 --- */
+const svg=$('grid');
+function svgPt(e){const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const p=pt.matrixTransform(svg.getScreenCTM().inverse());return{x:p.x,y:p.y,c:Math.floor(p.x/CELL),r:Math.floor(p.y/CELL)}}
+svg.addEventListener('pointerdown',e=>{
+  const p=svgPt(e);if(!inGrid(p.c,p.r))return;
+  try{svg.setPointerCapture(e.pointerId)}catch(_){}
+  S.drag={from:atAt(p.c,p.r),c0:p.c,r0:p.r,x0:e.clientX,y0:e.clientY,moved:false};
+});
+svg.addEventListener('pointermove',e=>{
+  const d=S.drag;if(!d)return;
+  if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)>14)d.moved=true;
+  if(!d.moved||d.from==null||S.erase)return;
+  const p=svgPt(e),A=S.atoms.get(d.from),ax=A.c*CELL+50,ay=A.r*CELL+50;
+  let o=`<line class="pv-line" x1="${ax}" y1="${ay}" x2="${p.x}" y2="${p.y}"/>`;
+  if(inGrid(p.c,p.r)&&!(p.c===A.c&&p.r===A.r))o=`<rect class="pv-cell${near(A,p.c,p.r)?'':' no'}" x="${p.c*CELL+8}" y="${p.r*CELL+8}" width="84" height="84" rx="18"/>`+o;
+  const ov=$('ov');if(ov)ov.innerHTML=o;
+});
+svg.addEventListener('pointercancel',()=>{S.drag=null;renderGrid()});
+svg.addEventListener('pointerup',e=>{
+  const d=S.drag;S.drag=null;if(!d)return;
+  const p=svgPt(e);
+  const tap=!d.moved||(p.c===d.c0&&p.r===d.r0);
+  if(tap){
+    const id=d.from;
+    if(S.erase){if(id!=null){snap();removeAtom(id);changed()}return}
+    if(id!=null){const a=S.atoms.get(id);if(a.el!==S.el){snap();a.el=S.el;changed()}return}
+    snap();addAtom(S.el,d.c0,d.r0);changed();return;
+  }
+  if(d.from==null||S.erase||!inGrid(p.c,p.r)){renderGrid();return}
+  const A=S.atoms.get(d.from);
+  if(!near(A,p.c,p.r)){toast('바로 옆 칸(대각선 포함)까지만 끌어서 이을 수 있어요.');renderGrid();return}
+  const tid=atAt(p.c,p.r);snap();
+  if(tid==null){const n=addAtom(S.el,p.c,p.r);S.bonds.push({a:d.from,b:n,o:1})}
+  else cycleBond(d.from,tid);
+  changed();
+});
+
+/* --- 원자 고르기 + 팔레트에서 끌어다 놓기 --- */
+const ghost=$('ghost');
+document.querySelectorAll('.tool[data-el]').forEach(btn=>{
+  let pd=null;
+  btn.addEventListener('pointerdown',e=>{
+    S.el=btn.dataset.el;S.erase=false;renderGrid();
+    try{btn.setPointerCapture(e.pointerId)}catch(_){}
+    pd={x0:e.clientX,y0:e.clientY,moved:false};
+  });
+  btn.addEventListener('pointermove',e=>{
+    if(!pd)return;
+    if(!pd.moved&&Math.hypot(e.clientX-pd.x0,e.clientY-pd.y0)>12){pd.moved=true;ghost.textContent=S.el;ghost.style.color=getComputedStyle(btn).color;ghost.hidden=false}
+    if(pd.moved)ghost.style.transform=`translate(${e.clientX}px,${e.clientY}px)`;
+  });
+  const end=e=>{
+    if(!pd)return;const moved=pd.moved;pd=null;ghost.hidden=true;
+    if(!moved||e.type==='pointercancel')return;
+    const p=svgPt(e);
+    const rect=svg.getBoundingClientRect();
+    if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom||!inGrid(p.c,p.r))return;
+    const id=atAt(p.c,p.r);
+    if(id!=null){const a=S.atoms.get(id);if(a.el!==S.el){snap();a.el=S.el;changed()}return}
+    snap();addAtom(S.el,p.c,p.r);changed();
+  };
+  btn.addEventListener('pointerup',end);btn.addEventListener('pointercancel',end);
+});
+$('erase').onclick=()=>{S.erase=!S.erase;renderGrid()};
+function clearAll(render=true){if(render){if(!S.atoms.size)return;snap()}else S.hist=[];S.atoms=new Map();S.bonds=[];if(render)changed()}
+$('clear').onclick=()=>clearAll(true);
+$('undo').onclick=undo;
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!$('group').hidden){e.preventDefault();undo()}});
+
+/* --- 자동 피드백: 만든 물질 판별 · 작용기 표시 · 목표와의 구조 차이 (반응 경로는 말하지 않음) --- */
+/* 용어는 여기 한 곳에서만 바꾸면 화면 전체에 반영됩니다 */
+const TERM={oh:'하이드록시기',cooh:'카복실기',coo:'에스터 결합',cho:'폼일기',co:'카보닐기',ether:'에터 결합',nh:'아미노기',cc2:'탄소 간 이중 결합'};
+const GSYM={oh:'−OH',cooh:'−COOH',coo:'−COO−',cho:'−CHO',co:'−CO−',ether:'−O−',nh:'−NH₂',cc2:'C=C'};
+const KIND={oh:'알코올',cooh:'카복실산',coo:'에스터',cho:'알데하이드',co:'케톤',ether:'에터',nh:'아민'};
+const KNOWN=[['메테인','C'],['에테인','CC'],['프로페인','CCC'],['에텐','C=C'],['메탄올','CO'],['에탄올','CCO'],['1-프로판올','CCCO'],['2-프로판올','CC(O)C'],['1-뷰탄올','CCCCO'],['3-메틸뷰탄-1-올','CC(C)CCO'],['폼알데하이드(메탄알)','C=O'],['아세트알데하이드(에탄알)','CC=O'],['프로판알','CCC=O'],['아세톤(프로판온)','CC(=O)C'],['메탄산(폼산)','C(=O)O'],['아세트산','CC(=O)O'],['프로판산','CCC(=O)O'],['뷰탄산','CCCC(=O)O'],['다이메틸 에터','COC'],['메탄산 메틸','C(=O)OC'],['아세트산 메틸','CC(=O)OC'],['메탄산 에틸','C(=O)OCC'],['아세트산 에틸','CC(=O)OCC'],['프로판산 에틸','CCC(=O)OCC'],['뷰탄산 에틸','CCCC(=O)OCC'],['아세트산 아이소아밀','CC(=O)OCCC(C)C'],['물','O'],['메틸아민','CN'],['에틸아민','CCN']].map(([n,s])=>({n,s,g:parseS(s)}));
+function josa(w,a,b){const s=String(w).replace(/\([^)]*\)\s*$/,'').trim();const ch=s.charCodeAt(s.length-1);if(ch<0xAC00||ch>0xD7A3)return w+b;return w+((ch-0xAC00)%28?a:b)}
+const gLabel=k=>`${TERM[k]}(${GSYM[k]})`;
+const PKEY={ester:'coo',acid:'cooh'};
+function groupsOf(g){
+  const out=[],carbonyl=new Set();
+  g.forEach((a,i)=>{
+    if(a.el!=='C')return;
+    const dO=a.nb.find(n=>n.o===2&&g[n.j].el==='O'&&g[n.j].nb.length===1);if(!dO)return;carbonyl.add(i);
+    const sO=a.nb.filter(n=>n.o===1&&g[n.j].el==='O');
+    const oh=sO.find(n=>g[n.j].h===1&&g[n.j].nb.length===1),or=sO.find(n=>g[n.j].h===0&&g[n.j].nb.length===2);
+    if(oh)out.push({k:'cooh',at:[i,dO.j,oh.j]});
+    else if(or)out.push({k:'coo',at:[i,dO.j,or.j]});
+    else if(a.h>=1)out.push({k:'cho',at:[i,dO.j]});
+    else if(a.nb.filter(n=>g[n.j].el==='C').length===2)out.push({k:'co',at:[i,dO.j]});
+  });
+  g.forEach((a,i)=>{
+    if(a.el==='O'&&a.nb.length===1&&a.h===1&&g[a.nb[0].j].el==='C'&&!carbonyl.has(a.nb[0].j))out.push({k:'oh',at:[i]});
+    if(a.el==='O'&&a.nb.length===2&&a.h===0&&a.nb.every(n=>g[n.j].el==='C'&&n.o===1&&!carbonyl.has(n.j)))out.push({k:'ether',at:[i]});
+    if(a.el==='N'&&a.h>=1&&a.nb.some(n=>g[n.j].el==='C'))out.push({k:'nh',at:[i]});
+    if(a.el==='C')a.nb.forEach(n=>{if(n.j>i&&n.o===2&&g[n.j].el==='C')out.push({k:'cc2',at:[i,n.j]})});
+  });
+  return out;
+}
+const kindsOf=gs=>[...new Set(gs.map(x=>x.k))];
+const nCarbon=g=>g.filter(a=>a.el==='C').length;
+function nameOf(g){const k=KNOWN.find(k=>iso(k.g,g));return k?k.n:''}
+function kindText(ks){const fk=ks.filter(k=>KIND[k]);if(!fk.length)return ks.includes('cc2')?'작용기가 없고 탄소 간 이중 결합이 있는 탄화수소':'작용기가 없는 탄화수소';return fk.map(k=>KIND[k]).join('·')}
+/* 학생 분자 하나에 대한 정보 (그래프, 원자 id, 작용기) */
+function molInfo(memb){
+  const {g,ids}=toGraphIds(memb),gs=groupsOf(g);
+  return {g,ids,gs,ks:kindsOf(gs),name:nameOf(g),f:formula(g),c:nCarbon(g),
+    hl:gs.map(x=>{const set=new Set(x.at.map(i=>ids[i]));x.at.forEach(i=>{const id=ids[i],el=S.atoms.get(id).el;if(el==='O'||el==='N'||x.k==='cho')hNbrs(id).forEach(h=>set.add(h))});return{ids:[...set],label:gLabel(x.k)}})};
+}
+function hNbrs(id){const out=[];S.bonds.forEach(b=>{const o=b.a===id?b.b:b.b===id?b.a:null;if(o!=null&&S.atoms.get(o).el==='H')out.push(o)});return out}
+function idLine(m){
+  const who=m.name?`${m.name} (${m.f})`:`분자식 ${m.f}인 물질`;
+  const gl=m.ks.filter(k=>k!=='cc2');
+  const kt=kindText(m.ks);
+  const gtxt=gl.length?`색으로 표시한 부분은 ${josa(gl.map(gLabel).join(', '),'이에요','예요')}. 그래서 이 물질은 ${josa(kt,'이에요','예요')}.`:`${josa(kt,'이에요','예요')}.`;
+  return {t:`만든 물질: ${who}`,d:gtxt};
+}
+function diffLines(m,tg,tname){
+  const tk=kindsOf(groupsOf(tg)),tc=nCarbon(tg),L=[];
+  L.push(`목표 물질: ${tname} (${formula(tg)})`);
+  if(m.c!==tc)L.push(`탄소 수: ${m.c}개 → ${tc}개가 되어야 해요.`);
+  const miss=tk.filter(k=>!m.ks.includes(k)),extra=m.ks.filter(k=>!tk.includes(k));
+  if(miss.length===1&&extra.length===1)L.push(`${gLabel(extra[0])} 대신 ${josa(gLabel(miss[0]),'이','가')} 있어야 해요.`);
+  else{
+    if(miss.length)L.push(`있어야 할 작용기: ${miss.map(gLabel).join(', ')}`);
+    if(extra.length)L.push(`목표 물질에는 없는 부분: ${extra.map(gLabel).join(', ')}`);
+  }
+  if(m.c===tc&&!miss.length&&!extra.length)L.push('탄소 수와 작용기 종류는 같아요. 작용기가 붙은 위치나 탄소 사슬의 가지 모양이 달라요.');
+  return L;
+}
+function patternDiff(m,need){
+  const L=[`목표: ${josa(gLabel(need),'을','를')} 가진 물질`];
+  if(m.ks.includes(need))return L;
+  L.push(`지금 물질에는 ${josa(gLabel(need),'이','가')} 없어요.`);
+  if(need==='coo'&&m.ks.includes('cooh'))L.push(`${gLabel('cooh')}의 H 자리에 탄소가 결합한 구조여야 해요.`);
+  if(need==='cooh'&&m.ks.includes('coo'))L.push(`${gLabel('coo')}의 한쪽 탄소 대신 H가 결합한 구조여야 해요.`);
+  return L;
+}
+/* 오답 피드백 만들기: 1차 오답은 물질 판별·작용기 표시, 2차 오답부터 목표와의 차이까지 */
+function buildFeedback(q,mols,stage){
+  const blocks=[],full=[],hl=[];
+  const pairs=[];
+  if(q.pattern){if(mols[0])pairs.push([mols[0],null])}
+  else{
+    const tg=q.answers.map(parseS),usedT=new Set(),usedM=new Set();
+    mols.forEach((m,i)=>{const j=tg.findIndex((t,k)=>!usedT.has(k)&&iso(t,m.g));if(j>=0){usedT.add(j);usedM.add(i)}});
+    mols.forEach((m,i)=>{
+      if(usedM.has(i))return;
+      let best=-1,bs=-1e9;
+      tg.forEach((t,k)=>{if(usedT.has(k))return;const tk=kindsOf(groupsOf(t));const sc=-Math.abs(nCarbon(t)-m.c)*2-tk.filter(x=>!m.ks.includes(x)).length*3-m.ks.filter(x=>!tk.includes(x)).length*3;if(sc>bs){bs=sc;best=k}});
+      if(best>=0){usedT.add(best);pairs.push([m,tg[best]])}else pairs.push([m,undefined]);
+    });
+    mols.forEach((m,i)=>{if(usedM.has(i))blocks.push({t:`${m.name||m.f}: 맞게 만들었어요 ✓`,d:'',L:[]})});
+  }
+  pairs.forEach(([m,t])=>{
+    hl.push(...m.hl);const id=idLine(m);let L=[];
+    if(q.pattern)L=patternDiff(m,PKEY[q.pattern]);
+    else if(t)L=diffLines(m,t,nameOf(t)||'목표 물질');
+    else L=['이 물질은 문제에서 요구하는 물질이 아니에요.'];
+    blocks.push({t:id.t,d:id.d,L:stage>=2?L:[]});
+    full.push(id.t+' — '+id.d+(L.length?' / '+L.join(' / '):''));
+  });
+  const hint=stage<2?'한 번 더 틀리면 목표 물질과 무엇이 다른지 알려 줄게요.':'';
+  return {blocks,full:full.join(' | '),hl,hint};
+}
+function fbHTML(blocks,hint){
+  return blocks.map(b=>`<div class="fbk"><b>${esc(b.t)}</b>${b.d?`<span>${esc(b.d)}</span>`:''}${b.L.length?`<ul>${b.L.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>`).join('')+(hint?`<div class="fbh">${esc(hint)}</div>`:'');
+}
+
+/* --- 채점 --- */
+function grade(){
+  const q=QS[S.q];
+  if(!S.atoms.size)return{ok:false,msg:'먼저 격자판에 분자를 만들어 주세요.'};
+  let over=false,under=false;
+  for(const a of S.atoms.values()){const f=free(a.id);if(f<0)over=true;else if(f>0)under=true}
+  if(over)return{ok:false,msg:'빨간 점선 원자는 결합이 너무 많아요. (C 4개, N 3개, O 2개, H 1개)'};
+  if(under)return{ok:false,msg:'숫자가 붙은 원자는 아직 결합이 덜 채워졌어요. 수소(H)나 이중 결합을 확인해 보세요.'};
+  const mols=groupsRaw().map(molInfo),cs=mols.map(m=>m.g);
+  let ok=false,head='';
+  if(q.pattern){
+    if(cs.length!==1)head=`분자를 하나만 만들어 주세요. 지금 서로 떨어진 분자가 ${cs.length}개 있어요.`;
+    else ok=PAT[q.pattern](cs[0]);
+  }else{
+    const ans=q.answers.map(parseS);
+    if(cs.length!==ans.length)head=`분자 ${ans.length}개가 필요해요. 지금은 ${cs.length}개예요. 서로 떨어진 분자는 따로 셉니다.`;
+    else{
+      const used=new Array(cs.length).fill(false);
+      const match=k=>{if(k===ans.length)return true;for(let i=0;i<cs.length;i++){if(used[i]||!iso(ans[k],cs[i]))continue;used[i]=true;if(match(k+1))return true;used[i]=false}return false};
+      ok=match(0);
+    }
+  }
+  if(ok)return{ok:true};
+  S.tries=(S.tries||0)+1;
+  const stage=S.tries>=2?2:1;
+  const fb=buildFeedback(q,mols,stage),full=buildFeedback(q,mols,2);
+  return{ok:false,msg:(head?head+' | ':'')+full.full,head,html:fbHTML(fb.blocks,fb.hint),hl:fb.hl};
+}
+/* --- 선생님 피드백 받기 (시트 연동 시) --- */
+let fbTimer=null;
+function renderTeacherFb(){const el=$('gTeacher');if(!el)return;el.innerHTML=S.tfbShown?`<div class="tfb pop"><b>선생님 피드백</b><span>${esc(S.tfbShown)}</span></div>`:''}
+function startFbPoll(){if(fbTimer||!SHEET_API)return;fbTimer=setInterval(pollFb,5000);pollFb()}
+async function pollFb(){
+  if(!SHEET_API||S.q==null||!S.lastT||document.hidden)return;
+  const d=new Date();d.setHours(0,0,0,0);
+  const u=SHEET_API+'?mode=mine&cls='+encodeURIComponent(S.cls)+'&grp='+encodeURIComponent(S.num!=null?S.num:S.group)+'&name='+encodeURIComponent(S.name||'')+'&q='+(S.q+1)+'&since='+d.getTime();
+  try{const j=await (await fetch(u)).json();const rs=(j.rows||[]).filter(r=>r.tfb).sort((a,b)=>a.t-b.t);const last=rs[rs.length-1];
+    if(last&&last.tfb!==S.tfbShown){S.tfbShown=last.tfb;renderTeacherFb()}}catch(e){}
+}
+/* --- 시트로 전송 --- */
+function structOf(){const ids=[...S.atoms.keys()],ix=new Map(ids.map((id,i)=>[id,i]));return{a:ids.map(id=>{const a=S.atoms.get(id);return[a.el,a.c,a.r]}),b:S.bonds.map(b=>[ix.get(b.a),ix.get(b.b),b.o])}}
+function structPNG(st){return new Promise(res=>{
+  const s=structSVG(st,true);if(!s)return res('');
+  const k=Math.min(600/s.w,360/s.h,1.5),W=Math.round(s.w*k),H=Math.round(s.h*k);
+  const xml=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${s.vb}">${s.inner}</svg>`;
+  const img=new Image();
+  img.onload=()=>{try{const cv=document.createElement('canvas');cv.width=W;cv.height=H;cv.getContext('2d').drawImage(img,0,0,W,H);res(cv.toDataURL('image/png'))}catch(e){res('')}};
+  img.onerror=()=>res('');img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+})}
+function setSent(t,c){const e=$('gSent');e.textContent=t;e.className='sent'+(c?' '+c:'')}
+async function send(r){
+  if(!SHEET_API)return;
+  setSent('선생님께 보내는 중…','');$('submit').disabled=true;
+  const st=structOf();let img='';try{img=await structPNG(st)}catch(e){}
+  const body={cls:S.cls,grp:S.num,name:S.name,q:S.q+1,ok:!!r.ok,sec:r.sec,formula:groupsRaw().map(liveFormula).join(' + '),msg:r.ok?'':r.msg,struct:st,image:img};
+  try{const res=await fetch(SHEET_API,{method:'POST',body:JSON.stringify(body)});const j=await res.json();if(j.ok&&j.t){S.lastT=j.t;startFbPoll()}setSent(j.ok?('선생님께 전송됨 ✓'+(j.rank?' · 이 문제 '+j.rank+'번째 정답':'')):'전송 실패 · 다시 제출해 주세요',j.ok?'ok':'bad')}
+  catch(e){setSent('전송을 확인하지 못했어요 · 인터넷 연결을 확인하세요','bad')}
+  setTimeout(()=>{$('submit').disabled=S.q==null},1200);
+}
+$('submit').onclick=()=>{if(S.q==null)return;const r=grade();r.sec=Math.max(1,Math.round((Date.now()-S.qStart)/1000));S.result=r;S.hl=r.hl||null;renderGrid();if(r.ok){S.solved.add(S.q+1);store.set('ps',[...S.solved])}renderGroupQ();if(S.atoms.size)send(r)};
+
+/* 시작 */
+renderBoard();renderGroupQ();renderGrid();route();
+</script>
+</body>
+</html>
