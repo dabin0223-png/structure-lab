@@ -190,7 +190,7 @@ button{cursor:pointer}
 <div id="app">
   <header class="top">
     <div class="brand"><h1>구조식 탐구</h1><span>화학 반응의 세계 · 3. 탄소 화합물과 반응</span></div>
-    <button class="ghost" id="toHome" type="button" hidden>화면 바꾸기</button>
+    
   </header>
 
   <section id="home" aria-label="화면 선택">
@@ -405,11 +405,10 @@ const PATHINT={ester:'에스터 결합(C=O에 붙은 −O−가 다시 탄소와
 function route(){
   const v='group';
   ['home','board','group'].forEach(s=>$(s).hidden=(s!==v));
-  $('toHome').hidden=true;
   if(v==='board')renderBoard();if(v==='group'){renderGroupQ();renderGrid()}
 }
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>location.hash=b.dataset.go);
-$('toHome').onclick=()=>{location.hash='home'};
+
 window.addEventListener('hashchange',route);
 
 /* ===== 전자칠판 ===== */
@@ -446,7 +445,9 @@ $('sReset').onclick=()=>{
 };
 
 /* ===== 제출 갤러리 (구글 시트 연동) ===== */
-const CLASSES=Array.from({length:12},(_,i)=>(i+1)+'반');
+const CLASSES=['A2반','B2반','C2반'];
+const GROUP_CLASSES=['B2반'];   /* 모둠 활동 반. 나머지 반은 개인 활동 */
+if(!CLASSES.includes(B.cls))B.cls='B2반';
 const ELC={C:'#2A2F2C',O:'#CC3B29',N:'#2856C8',H:'#6F7D77'};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* 구조 데이터 → SVG (inline=true면 시트 저장용 그림으로 색을 직접 지정) */
@@ -492,7 +493,7 @@ function award(){
 }
 function renderSync(){
   const s=$('sync');if(!s)return;
-  if(!SHEET_API){s.className='sync off';s.textContent='시트 미연결 · index.html의 SHEET_API에 주소를 넣어 주세요';return}
+  if(!SHEET_API){s.className='sync off';s.textContent='시트 미연결 · config.js에 시트 주소를 넣어 주세요';return}
   if(G.err){s.className='sync off';s.textContent='시트 연결 오류 · 다시 시도하는 중';return}
   s.className='sync on';s.textContent=G.last?'시트 연결됨 · '+Math.round((Date.now()-G.last)/1000)+'초 전 갱신':'시트 연결 중…';
 }
@@ -537,8 +538,9 @@ if(!SHEET_API)document.querySelector('.gallery').hidden=true;
 
 /* ===== 모둠 작업대 ===== */
 const COLS=12,ROWS=7,CELL=100;
-const S={q:null,cls:store.get('pc','1반'),num:store.get('pn',''),name:store.get('pm',''),solved:new Set(store.get('ps',[])),el:'C',erase:false,atoms:new Map(),bonds:[],seq:0,result:null,qStart:Date.now(),hist:[],drag:null};
-const clsSel=$('cls');CLASSES.forEach(c=>clsSel.insertAdjacentHTML('beforeend',`<option>${c}</option>`));
+const S={q:null,cls:store.get('pc','A2반'),num:store.get('pn',''),name:store.get('pm',''),solved:new Set(store.get('ps',[])),el:'C',erase:false,atoms:new Map(),bonds:[],seq:0,result:null,qStart:Date.now(),hist:[],drag:null};
+const SOLO_CLASSES=CLASSES.filter(c=>!GROUP_CLASSES.includes(c));if(!SOLO_CLASSES.includes(S.cls))S.cls=SOLO_CLASSES[0];
+const clsSel=$('cls');SOLO_CLASSES.forEach(c=>clsSel.insertAdjacentHTML('beforeend',`<option>${c}</option>`));
 clsSel.value=S.cls;$('num').value=S.num;$('nm').value=S.name;
 const meLabel=()=>`${S.cls} ${S.num}번 ${S.name}`;
 $('idBox').addEventListener('submit',e=>{

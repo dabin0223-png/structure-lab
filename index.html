@@ -250,7 +250,7 @@ button{cursor:pointer}
             <button class="btn alt" id="tReset" type="button">처음부터</button>
           </div>
         </div>
-        <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+        <div class="panel" id="scorePanel" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="eyebrow">모둠 점수</span>
             <div class="gcount" id="gCount" aria-label="모둠 수"></div>
@@ -258,10 +258,14 @@ button{cursor:pointer}
           <div class="score" id="scores"></div>
           <button class="ghost" id="sReset" type="button">점수 초기화</button>
         </div>
+        <div class="panel" id="lbPanel" hidden style="display:flex;flex-direction:column;gap:10px">
+          <span class="eyebrow">개인 정답 순위 · 이번 수업</span>
+          <div class="otable"><table><thead><tr><th>순위</th><th>학생</th><th>맞힌 문제</th><th>마지막 정답</th></tr></thead><tbody id="lbBody"></tbody></table></div>
+        </div>
       </div>
       <div class="panel gallery">
         <div class="ghead">
-          <h3>제출 갤러리 <span id="gQlabel" style="color:var(--accent)"></span></h3>
+          <h3>제출 현황 <span id="gQlabel" style="color:var(--accent)"></span></h3>
           <div class="brow" style="align-items:center">
             <label class="eyebrow" for="bCls">학급</label><select class="sel2" id="bCls"></select>
             <button class="ghost" id="newLesson" type="button">새 수업 시작</button>
@@ -446,7 +450,9 @@ $('sReset').onclick=()=>{
 };
 
 /* ===== 제출 갤러리 (구글 시트 연동) ===== */
-const CLASSES=Array.from({length:12},(_,i)=>(i+1)+'반');
+const CLASSES=['A2반','B2반','C2반'];
+const GROUP_CLASSES=['B2반'];   /* 모둠 활동 반. 나머지 반은 개인 활동 */
+if(!CLASSES.includes(B.cls))B.cls='B2반';
 const ELC={C:'#2A2F2C',O:'#CC3B29',N:'#2856C8',H:'#6F7D77'};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* 구조 데이터 → SVG (inline=true면 시트 저장용 그림으로 색을 직접 지정) */
@@ -492,7 +498,7 @@ function award(){
 }
 function renderSync(){
   const s=$('sync');if(!s)return;
-  if(!SHEET_API){s.className='sync off';s.textContent='시트 미연결 · index.html의 SHEET_API에 주소를 넣어 주세요';return}
+  if(!SHEET_API){s.className='sync off';s.textContent='시트 미연결 · config.js에 시트 주소를 넣어 주세요';return}
   if(G.err){s.className='sync off';s.textContent='시트 연결 오류 · 다시 시도하는 중';return}
   s.className='sync on';s.textContent=G.last?'시트 연결됨 · '+Math.round((Date.now()-G.last)/1000)+'초 전 갱신':'시트 연결 중…';
 }
@@ -511,8 +517,18 @@ function renderOrder(q){
   }).join('');
   body.querySelectorAll('.linkbtn').forEach(b=>b.onclick=()=>{const r=G.rows.find(x=>String(x.t)===b.dataset.t);if(r)openSub(keyOf(r),r.q,r.t)});
 }
+function renderLeaderboard(){
+  const body=$('lbBody');if(!body)return;
+  const m=new Map();
+  G.rows.filter(r=>r.name).sort((a,b)=>a.t-b.t).forEach(r=>{const k=keyOf(r);if(!m.has(k))m.set(k,{r,qs:new Set(),last:0});const e=m.get(k);if(r.ok&&!e.qs.has(r.q)){e.qs.add(r.q);e.last=r.t}});
+  const list=[...m.values()].filter(e=>e.qs.size).sort((a,b)=>b.qs.size-a.qs.size||a.last-b.last);
+  body.innerHTML=list.length?list.slice(0,40).map((e,i)=>`<tr class="${i===0?'first':''}"><td class="mono">${i+1}</td><td>${esc(e.r.grp+'번 '+e.r.name)}</td><td class="mono">${e.qs.size}문제</td><td class="mono">${clock(e.last).slice(0,8)}</td></tr>`).join(''):'<tr class="empty-row"><td colspan="4">아직 정답이 없습니다</td></tr>';
+}
 function renderGallery(){
-  const el=$('cards');if(!el)return;const q=B.q+1;$('gQlabel').textContent='· Q'+q;
+  const el=$('cards');if(!el)return;const q=B.q+1;$('gQlabel').textContent='· '+B.cls+' · Q'+q;
+  const grpMode=GROUP_CLASSES.includes(B.cls);
+  el.hidden=!grpMode;$('scorePanel').hidden=!grpMode;$('lbPanel').hidden=grpMode;
+  if(!grpMode){renderOrder(q);renderLeaderboard();renderSync();return}
   let h='';
   for(let g=1;g<=B.groups;g++){
     const rs=rowsFor(g,q),last=rs[rs.length-1];
@@ -551,7 +567,7 @@ function showSub(rs,i,q){
   $('tfSend').onclick=async()=>{
     const text=$('tfText').value.trim();if(!text){$('tfMsg').textContent='보낼 내용을 입력하세요.';$('tfMsg').className='sent bad';return}
     $('tfSend').disabled=true;$('tfMsg').textContent='보내는 중…';$('tfMsg').className='sent';
-    try{const j=await (await fetch(SHEET_API,{method:'POST',body:JSON.stringify({action:'feedback',t:r.t,text})})).json();
+    try{const j=await (await fetch(SHEET_API,{method:'POST',body:JSON.stringify({action:'feedback',cls:r.cls,t:r.t,text})})).json();
       if(j.ok){r.tfb=text;$('tfMsg').textContent='학생 화면으로 보냈습니다 ✓';$('tfMsg').className='sent ok';renderGallery()}
       else{$('tfMsg').textContent='보내지 못했습니다. 다시 눌러 주세요.';$('tfMsg').className='sent bad'}}
     catch(e){$('tfMsg').textContent='인터넷 연결을 확인하세요.';$('tfMsg').className='sent bad'}
@@ -573,10 +589,11 @@ if(!SHEET_API)document.querySelector('.gallery').hidden=true;
 
 /* ===== 모둠 작업대 ===== */
 const COLS=12,ROWS=7,CELL=100;
-const S={q:null,code:'',cls:store.get('gc','1반'),group:store.get('gg',1),el:'C',erase:false,atoms:new Map(),bonds:[],seq:0,result:null,qStart:Date.now(),hist:[],drag:null};
+const S={q:null,code:'',cls:'B2반',group:store.get('gg',1),el:'C',erase:false,atoms:new Map(),bonds:[],seq:0,result:null,qStart:Date.now(),hist:[],drag:null};
 const grpSel=$('grp');for(let i=1;i<=8;i++)grpSel.insertAdjacentHTML('beforeend',`<option value="${i}">${i}모둠</option>`);
 grpSel.value=S.group;grpSel.onchange=()=>{S.group=+grpSel.value;store.set('gg',S.group)};
-const clsSel=$('cls');CLASSES.forEach(c=>clsSel.insertAdjacentHTML('beforeend',`<option>${c}</option>`));
+S.cls=GROUP_CLASSES[0];
+const clsSel=$('cls');GROUP_CLASSES.forEach(c=>clsSel.insertAdjacentHTML('beforeend',`<option>${c}</option>`));
 clsSel.value=S.cls;clsSel.onchange=()=>{S.cls=clsSel.value;store.set('gc',S.cls)};
 
 function snap(){S.hist.push({atoms:[...S.atoms.values()].map(a=>({...a})),bonds:S.bonds.map(b=>({...b}))});if(S.hist.length>80)S.hist.shift()}
